@@ -1,0 +1,91 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: notifications
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: notifications
+    spec:
+      imagePullSecrets:
+        - name: ecr-image-pull-secret
+      containers:
+      - image: 382942022480.dkr.ecr.us-east-1.amazonaws.com/notifications:**TAG**
+        name: notifications
+        ports:
+        - name: notificationsport
+          containerPort: 5001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications
+  namespace: test
+spec:
+  ports:
+  - port: 5001
+    protocol: TCP
+    targetPort: notificationsport
+  type: ClusterIP
+  selector:
+    app: notifications
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications-postgres-service
+  namespace: test
+spec:
+  selector:
+    app: notifications-postgres
+  ports:
+    - name: notifications-postgres
+      port: 5432
+  clusterIP: None
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications-postgres
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      app: notifications-postgres
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: notifications-postgres
+    spec:
+      containers:
+        - name: notifications-postgres
+          image: postgres:12.4
+          env:
+            - name: POSTGRES_USER
+              value: admin
+            - name: POSTGRES_PASSWORD
+              value: password
+            - name: POSTGRES_DB
+              value: postgres
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: notifications-postgres-data
+              mountPath: /var/lib/notifications/postgresql/data
+      volumes:
+        - name: notifications-postgres-data
+          emptyDir: {}
